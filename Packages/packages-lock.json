@@ -39,11 +39,11 @@
       "hash": "6baeccf6c544c155497164327cca72f28163a578"
     },
     "com.svermeulen.extenject": {
-      "version": "https://github.com/Mathijs-Bakker/Extenject.git?path=UnityProject/Assets/Plugins/Zenject/Source#54b95b22c5eabd16ad342b5ba78d67996bb078a5",
+      "version": "https://github.com/Mathijs-Bakker/Extenject.git?path=UnityProject/Assets/Plugins/Zenject/Source#8495d61cebe4175b358370a3599b32ae976d6de6",
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "54b95b22c5eabd16ad342b5ba78d67996bb078a5"
+      "hash": "8495d61cebe4175b358370a3599b32ae976d6de6"
     },
     "com.unity.2d.animation": {
       "version": "15.1.0",

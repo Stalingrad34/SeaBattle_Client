@@ -1,0 +1,7 @@
+{
+  "name": "SeaBattle.Tests.EditMode",
+  "references": ["SeaBattle.Runtime", "Zenject", "UniTask", "UniRx", "ColyseusSDK"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}
+

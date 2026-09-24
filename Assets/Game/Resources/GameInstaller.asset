@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63454e11a7625dc46b1c72b9bab3ff6f, type: 3}
+  m_Name: GameInstaller
+  m_EditorClassIdentifier: SeaBattle.Runtime::Game.Scripts.Infrastructure.Implementations.GameInstaller
+  connectionConfig: {fileID: 11400000, guid: afc4962a6cd6f76429f9f8cf12110fdd, type: 2}
+  gameConfig: {fileID: 11400000, guid: 28b3bba9b3528c04ba7cbded8c7e856a, type: 2}
+  uiManager: {fileID: 7234132828249969566, guid: f985f38123ce59d4b87e0f1763178cbb, type: 3}

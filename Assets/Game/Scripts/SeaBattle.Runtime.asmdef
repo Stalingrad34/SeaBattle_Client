@@ -1,0 +1,5 @@
+{
+  "name": "SeaBattle.Runtime",
+  "references": ["Zenject", "UniTask", "UniRx", "ColyseusSDK", "PrimeTween.Runtime", "Unity.ugui"]
+}
+
