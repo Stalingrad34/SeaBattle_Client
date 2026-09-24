@@ -8,7 +8,7 @@ using Game.Scripts.Infrastructure.Core.States;
 
 namespace Game.Scripts.Infrastructure.Implementations.States
 {
-    public sealed class LoadingState : IState
+    public sealed class LoadingState : IEnterStateAsync
     {
         private readonly GameConfig _game;
         private readonly ConnectionConfig _network;
@@ -22,20 +22,15 @@ namespace Game.Scripts.Infrastructure.Implementations.States
             _states = states;
         }
 
-        public async UniTask EnterAsync(CancellationToken token)
+        public async UniTask Enter()
         {
-            token.ThrowIfCancellationRequested();
             _game.Validate();
             _network.Validate();
             foreach (var service in _services)
-                await service.InitAsync(token);
-            token.ThrowIfCancellationRequested();
-            // Queue the transition; do not await while this state's Enter holds the transition gate.
-            _states.EnterAsync<GameState>(CancellationToken.None).Forget(UnityEngine.Debug.LogException);
+                await service.InitAsync(CancellationToken.None);
+            
+            _states.EnterAsync<GameState>().Forget();
         }
 
-        public void Exit()
-        {
-        }
     }
 }

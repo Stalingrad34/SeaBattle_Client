@@ -6,7 +6,7 @@ namespace Game.Scripts.Infrastructure.Core.Network
     public sealed class ConnectionConfig : ScriptableObject
     {
         public string Endpoint = "ws://127.0.0.1:2567";
-        public string RoomName = "connection";
+        public string RoomName = "battle";
         [Min(1)]
         public int TimeoutSeconds = 10;
         [Min(0.1f)]

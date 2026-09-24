@@ -1,75 +1,76 @@
-using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
+using Game.Scripts.Infrastructure.Core.UI;
 
 namespace Game.Scripts.Infrastructure.Core.States
 {
-    /// <summary>Transitions are serialized; a newer request cancels the previous state's work.</summary>
-    public sealed class StateMachine : IDisposable
+    public class StateMachine
     {
-        private readonly StateFactory _factory;
-        private readonly SemaphoreSlim _gate = new(1, 1);
-        private readonly CancellationTokenSource _lifetime = new();
-        private CancellationTokenSource _stateLifetime;
-        private IState _current;
-        private int _version;
-        private bool _disposed;
-        public Type CurrentType => _current?.GetType();
+        private readonly StateFactory _stateFactory;
+        private readonly UIManager _uiManager;
+        private IState _currentState;
 
-        public StateMachine(StateFactory factory)
+        public StateMachine(StateFactory stateFactory, UIManager uiManager)
         {
-            _factory = factory;
+            _stateFactory = stateFactory;
+            _uiManager = uiManager;
         }
 
-        public async UniTask EnterAsync<T>(CancellationToken token)
-            where T : class, IState
+        public void Enter<TState>() where TState: class, IEnterState
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(StateMachine));
-            var version = ++_version;
-            _stateLifetime?.Cancel();
-            using var request = CancellationTokenSource.CreateLinkedTokenSource(token, _lifetime.Token);
-            await _gate.WaitAsync(request.Token);
-            try
-            {
-                request.Token.ThrowIfCancellationRequested();
-                if (version != _version)
-                    return;
-                ExitCurrent();
-                _stateLifetime = CancellationTokenSource.CreateLinkedTokenSource(token, _lifetime.Token);
-                _current = _factory.Create<T>();
-                await _current.EnterAsync(_stateLifetime.Token);
-            }
-            finally
-            {
-                _gate.Release();
-            }
+            ExitCurrentState();
+            var state = ChangeState<TState>();
+            state.Enter();
         }
 
-        private void ExitCurrent()
+        public void Enter<TState, TArgs>(TArgs args) where TState: class, IEnterStateArgs<TArgs>
         {
-            _stateLifetime?.Cancel();
-            _current?.Exit();
-            _current = null;
-            _stateLifetime?.Dispose();
-            _stateLifetime = null;
+            ExitCurrentState();
+            var state = ChangeState<TState>();
+            state.Enter(args);
+        }
+
+        public async UniTask EnterAsync<TState>() where TState: class, IEnterStateAsync
+        {
+            await ExitCurrentStateAsync();
+            var state = ChangeState<TState>();
+            await state.Enter();
+        }
+
+        public async UniTask EnterAsync<TState, TArgs>(TArgs args) where TState: class, IEnterStateArgsAsync<TArgs>
+        {
+            await ExitCurrentStateAsync();
+            var state = ChangeState<TState>();
+            await state.Enter(args);
         }
 
         public void Reset()
         {
-            ++_version;
-            ExitCurrent();
+            ExitCurrentState();
+            _currentState = null;
+            _uiManager.Clear();
         }
 
-        public void Dispose()
+        private TState ChangeState<TState>() where TState : class, IState
         {
-            if (_disposed)
-                return;
-            _disposed = true;
-            _lifetime.Cancel();
-            ExitCurrent();
-            // Waiters may still be unwinding; do not dispose their semaphore.
-            _lifetime.Dispose();
+            _uiManager.Clear();
+
+            _currentState = _stateFactory.Create<TState>();
+            return _currentState as TState;
+        }
+
+        private void ExitCurrentState()
+        {
+            if (_currentState is IExitState exitState)
+                exitState.Exit();
+        }
+
+        private async UniTask ExitCurrentStateAsync()
+        {
+            if (_currentState is IExitStateAsync exitStateAsync)
+                await exitStateAsync.ExitAsync();
+
+            if (_currentState is IExitState exitState)
+                exitState.Exit();
         }
     }
 }

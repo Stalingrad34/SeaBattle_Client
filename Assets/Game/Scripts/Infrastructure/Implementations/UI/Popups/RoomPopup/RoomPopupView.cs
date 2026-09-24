@@ -1,4 +1,5 @@
 using Game.Scripts.Infrastructure.Core.UI;
+using Game.Scripts.Infrastructure.Core.Extensions;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,14 +8,11 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
 {
     public sealed class RoomPopupView : PopupView<RoomPopupModel>
     {
-        [SerializeField]
-        private InputField joinInput;
-        [SerializeField]
-        private InputField createInput;
-        [SerializeField]
-        private Button joinButton;
-        [SerializeField]
-        private Button createButton;
+        [SerializeField] private InputField joinInput;
+        [SerializeField] private InputField createInput;
+        [SerializeField] private Button joinButton;
+        [SerializeField] private Button createButton;
+
         protected override void SetModel(RoomPopupModel model)
         {
             Bind(joinInput, joinButton, model.JoinRoomName);
@@ -25,17 +23,14 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
         {
             input.characterLimit = RoomName.Length;
             input.onValidateInput = (_, _, c) => RoomName.IsAllowed(c) ? c : '\0';
-            input.OnValueChangedAsObservable().Subscribe(value =>
+            input.OnValueChanged(value =>
             {
                 var normalized = RoomName.Normalize(value);
                 input.SetTextWithoutNotify(normalized);
                 name.Value = normalized;
-            }).AddTo(Subscriptions);
-            name.Subscribe(value =>
-            {
-                input.SetTextWithoutNotify(value);
-                button.interactable = RoomName.IsValid(value);
-            }).AddTo(Subscriptions);
+            }).AddTo(gameObject);
+            name.SubscribeToInputField(input).AddTo(gameObject);
+            name.Select(RoomName.IsValid).SubscribeBtnInteractable(button).AddTo(gameObject);
         }
 
         protected override void OnDestroy()

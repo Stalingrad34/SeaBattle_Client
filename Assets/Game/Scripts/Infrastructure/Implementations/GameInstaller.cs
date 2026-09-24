@@ -26,7 +26,7 @@ namespace Game.Scripts.Infrastructure.Implementations
             Container.BindInstance(gameConfig);
             Container.Bind<UIManager>().FromComponentInNewPrefab(uiManager).AsSingle();
             Container.Bind<StateFactory>().AsSingle();
-            Container.BindInterfacesAndSelfTo<StateMachine>().AsSingle();
+            Container.Bind<StateMachine>().AsSingle();
             Container.Bind<LoadingState>().AsSingle();
             Container.Bind<GameState>().AsSingle();
             Container.BindInterfacesAndSelfTo<ColyseusTransportService>().AsSingle();

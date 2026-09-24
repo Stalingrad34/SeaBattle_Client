@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: ConnectionConfig
   m_EditorClassIdentifier: Assembly-CSharp::Game.Scripts.Infrastructure.Core.Network.ConnectionConfig
   Endpoint: ws://127.0.0.1:2567
-  RoomName: connection
+  RoomName: battle
   TimeoutSeconds: 10

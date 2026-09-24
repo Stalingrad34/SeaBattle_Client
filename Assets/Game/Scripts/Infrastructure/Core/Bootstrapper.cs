@@ -1,4 +1,3 @@
-using System;
 using Cysharp.Threading.Tasks;
 using Game.Scripts.Infrastructure.Core.States;
 using Game.Scripts.Infrastructure.Implementations.States;
@@ -20,11 +19,7 @@ namespace Game.Scripts.Infrastructure.Core
         {
             Application.targetFrameRate = 60;
             Application.runInBackground = true;
-            _states.EnterAsync<LoadingState>(this.GetCancellationTokenOnDestroy()).Forget(exception =>
-            {
-                if (exception is not OperationCanceledException)
-                    Debug.LogException(exception);
-            });
+            _states.EnterAsync<LoadingState>().Forget();
         }
 
         private void OnDestroy()

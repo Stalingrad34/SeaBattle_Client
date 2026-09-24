@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Zenject;
@@ -19,10 +18,9 @@ namespace Game.Scripts.Infrastructure.Core.UI
             _container = container;
         }
 
-        public UniTask ShowPopupAsync<TView, TModel>(TModel model, CancellationToken token)
+        public UniTask ShowPopupAsync<TView, TModel>(TModel model)
             where TView : PopupView<TModel> where TModel : PopupModel
         {
-            token.ThrowIfCancellationRequested();
             if (_popups.ContainsKey(model))
                 return UniTask.CompletedTask;
             var prefab = Resources.Load<TView>("Popups/" + typeof(TView).Name);
@@ -44,11 +42,23 @@ namespace Game.Scripts.Infrastructure.Core.UI
             model.Dispose();
         }
 
+        public void Clear()
+        {
+            foreach (var popup in _popups)
+            {
+                if (popup.Value != null)
+                {
+                    popup.Value.gameObject.SetActive(false);
+                    Destroy(popup.Value.gameObject);
+                }
+                popup.Key.Dispose();
+            }
+            _popups.Clear();
+        }
+
         private void OnDestroy()
         {
-            foreach (var model in _popups.Keys)
-                model.Dispose();
-            _popups.Clear();
+            Clear();
         }
     }
 }

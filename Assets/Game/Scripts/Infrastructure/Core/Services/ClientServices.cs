@@ -13,15 +13,16 @@ namespace Game.Scripts.Infrastructure.Core.Services
 
         string SessionId { get; }
 
-        IObservable<string> Messages { get; }
+        IObservable<CommandResult> CommandResults { get; }
+
+        IObservable<string> Errors { get; }
 
         IObservable<MatchState> StateChanged { get; }
 
         IObservable<int> Disconnected { get; }
 
         UniTask ConnectAsync(CancellationToken token);
-        UniTask ProbeAsync(CancellationToken token);
-        UniTask SendAsync(ClientMessage message, CancellationToken token);
+        UniTask SendAsync(FireCommand command, CancellationToken token);
     }
 
     public interface ISessionService : IService
@@ -30,12 +31,7 @@ namespace Game.Scripts.Infrastructure.Core.Services
 
         string PlayerId { get; }
 
-        string ConnectionId { get; }
-
-        string ResumeToken { get; }
-
         void BeginConnection(string matchId, string playerId);
-        void AcceptWelcome(ServerMessage welcome);
     }
 
     public interface IMatchService : IService, IDisposable
