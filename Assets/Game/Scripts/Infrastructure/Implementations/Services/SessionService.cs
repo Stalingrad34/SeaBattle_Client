@@ -30,15 +30,10 @@ namespace Game.Scripts.Infrastructure.Implementations.Services
             }
         }
 
-        public void BeginConnection(string matchId, string playerId)
+        public void SaveConnection(string endpoint, string matchId, string playerId, string reconnectionToken)
         {
             Recovery.roomId = matchId;
             Recovery.playerId = playerId;
-        }
-
-        public void SaveConnection(string endpoint, string matchId, string playerId, string reconnectionToken)
-        {
-            BeginConnection(matchId, playerId);
             Recovery.endpoint = endpoint;
             Recovery.reconnectionToken = reconnectionToken;
             Save();

@@ -21,6 +21,7 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.GameOverPopup
         public GameOverPopupModel(bool won, UIManager ui, StateMachine states, ITransportService transport) : base(ui)
         {
             Won.Value = won;
+            Won.AddTo(Disposables);
             _states = states;
             _transport = transport;
         }

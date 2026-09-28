@@ -97,7 +97,6 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
                 x = x,
                 y = y
             };
-            _sentAtMs = _time.NowMs;
             _result = null;
             _timedOut = false;
             _session.SavePending(Pending.Value);

@@ -27,7 +27,7 @@ namespace Game.Tests
         public void SetUp()
         {
             var session = _session = new SessionService();
-            session.BeginConnection("TEST0001", "a");
+            session.SaveConnection("ws://localhost:2567", "TEST0001", "a", null);
             _transport = new FakeTransport { CurrentState = Snapshot(1, "a") };
             _time = new FakeTime();
             _match = new MatchService(session);
@@ -42,6 +42,42 @@ namespace Game.Tests
             _match.Dispose();
             _transport.Dispose();
             UnityEngine.Object.DestroyImmediate(_config);
+        }
+
+        [Test]
+        public void OldReplyAndOldSchemaCannotResolveOrRollbackNextShot()
+        {
+            _model.FireAsync(0, 0).GetAwaiter().GetResult();
+            var oldReply = Result("applied");
+            _transport.Results.OnNext(oldReply);
+            _transport.States.OnNext(Snapshot(2, "b", true));
+            _transport.States.OnNext(Snapshot(3, "a", true));
+            _model.FireAsync(1, 0).GetAwaiter().GetResult();
+            var pending = _model.Pending.Value;
+            _transport.Results.OnNext(oldReply);
+            _transport.States.OnNext(Snapshot(1, "a"));
+            Assert.That(_model.State.Value.revision, Is.EqualTo(3));
+            Assert.That(_model.Pending.Value, Is.SameAs(pending));
+            Assert.That(_model.CanFire.Value, Is.False);
+            Assert.That(_model.State.Value.players["a"].outgoingShots.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void LateRejectionAfterTurnChangeClearsPendingWithoutPaintingAShot()
+        {
+            _model.FireAsync(0, 0).GetAwaiter().GetResult();
+            _transport.States.OnNext(Snapshot(2, "b"));
+            _time.NowMs = 11000;
+            _model.Tick();
+            Assert.That(_transport.SendCount, Is.EqualTo(2));
+            var result = Result("rejected");
+            result.reason = "turn_expired";
+            _transport.Results.OnNext(result);
+            Assert.That(_model.Pending.Value, Is.Null);
+            Assert.That(_session.Recovery.pending, Is.Null);
+            Assert.That(_model.Feedback.Value, Does.Contain("истекло"));
+            Assert.That(_model.State.Value.players["a"].outgoingShots.Count, Is.Zero);
+            Assert.That(_model.CanFire.Value, Is.False);
         }
 
         [Test]
@@ -258,15 +294,9 @@ namespace Game.Tests
             }
             public readonly Subject<CommandResult> Results = new();
             public readonly Subject<MatchState> States = new();
-            public readonly Subject<int> Leaves = new();
-            private readonly Subject<string> _errors = new();
-            public string RoomId => "TEST0001";
-            public string SessionId => "a";
             public MatchState CurrentState { get; set; }
             public IObservable<CommandResult> CommandResults => Results;
-            public IObservable<string> Errors => _errors;
             public IObservable<MatchState> StateChanged => States;
-            public IObservable<int> Disconnected => Leaves;
             public int SendCount { get; private set; }
             public FireCommand LastCommand { get; private set; }
             public UniTask ConnectAsync(string roomName, bool create, CancellationToken token)
@@ -287,8 +317,6 @@ namespace Game.Tests
                 Connection.Dispose();
                 Results.Dispose();
                 States.Dispose();
-                Leaves.Dispose();
-                _errors.Dispose();
             }
         }
     }

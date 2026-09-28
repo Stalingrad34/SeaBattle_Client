@@ -133,11 +133,9 @@ namespace Game.Tests
         [Test]
         public void DisabledLogStopsRecordingAndHistoryIsBounded()
         {
-            var notifications = 0;
-            using var subscription = _diagnostics.Entries.Subscribe(_ => notifications++);
             _diagnostics.Enabled.Value = false;
             _diagnostics.Record("send", "fire");
-            Assert.That(notifications, Is.Zero);
+            Assert.That(_diagnostics.Log.Value, Is.Empty);
             _diagnostics.Enabled.Value = true;
             for (var i = 0; i < 50; i++)
                 _diagnostics.Record("send", "fire");

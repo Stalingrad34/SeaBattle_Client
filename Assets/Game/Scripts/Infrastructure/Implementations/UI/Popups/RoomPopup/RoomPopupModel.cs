@@ -15,10 +15,10 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
         {
         }
 
-        public ReactiveProperty<string> JoinRoomName { get; } = new("");
-        public ReactiveProperty<string> CreateRoomName { get; } = new("");
-        public ReactiveProperty<bool> Busy { get; } = new(false);
-        public ReactiveProperty<string> Status { get; } = new("");
+        public readonly ReactiveProperty<string> JoinRoomName = new("");
+        public readonly ReactiveProperty<string> CreateRoomName = new("");
+        public readonly ReactiveProperty<bool> Busy = new(false);
+        public readonly ReactiveProperty<string> Status = new("");
         private readonly ITransportService _transport;
         private readonly IMatchService _match;
         private readonly UIManager _ui;
@@ -49,11 +49,7 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
             {
                 _match.Reset();
                 await _transport.ConnectAsync(name, create, _lifetime.Token);
-                _lifetime.Token.ThrowIfCancellationRequested();
-                var battle = _battleFactory.Create();
-                await _ui.ShowPopupAsync<BattlePopupView, BattlePopupModel>(battle);
-                _enteredBattle = true;
-                Close();
+                await EnterBattleAsync();
             }
             catch (OperationCanceledException)
             {
@@ -89,10 +85,7 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
                 _match.Reset();
                 if (await _transport.ResumeAsync(_lifetime.Token))
                 {
-                    var battle = _battleFactory.Create();
-                    await _ui.ShowPopupAsync<BattlePopupView, BattlePopupModel>(battle);
-                    _enteredBattle = true;
-                    Close();
+                    await EnterBattleAsync();
                 }
                 else
                 {
@@ -114,6 +107,15 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
                 if (!_lifetime.IsCancellationRequested)
                     Busy.Value = false;
             }
+        }
+
+        private async UniTask EnterBattleAsync()
+        {
+            _lifetime.Token.ThrowIfCancellationRequested();
+            var battle = _battleFactory.Create();
+            await _ui.ShowPopupAsync<BattlePopupView, BattlePopupModel>(battle);
+            _enteredBattle = true;
+            Close();
         }
 
         public override void Dispose()

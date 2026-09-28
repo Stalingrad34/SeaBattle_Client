@@ -9,20 +9,13 @@ namespace Game.Scripts.Infrastructure.Core.Services
 {
     public interface ITransportService : IService, IDisposable
     {
-        string RoomId { get; }
-
-        string SessionId { get; }
         MatchState CurrentState { get; }
         IReadOnlyReactiveProperty<ConnectionStatus> Status { get; }
         bool CanResume { get; }
 
         IObservable<CommandResult> CommandResults { get; }
 
-        IObservable<string> Errors { get; }
-
         IObservable<MatchState> StateChanged { get; }
-
-        IObservable<int> Disconnected { get; }
 
         UniTask ConnectAsync(string roomName, bool create, CancellationToken token);
         UniTask<bool> ResumeAsync(CancellationToken token);
@@ -38,7 +31,6 @@ namespace Game.Scripts.Infrastructure.Core.Services
         string PlayerId { get; }
         RecoverySession Recovery { get; }
 
-        void BeginConnection(string matchId, string playerId);
         void SaveConnection(string endpoint, string matchId, string playerId, string reconnectionToken);
         void SavePending(FireCommand command);
         void Clear();
@@ -69,8 +61,6 @@ namespace Game.Scripts.Infrastructure.Core.Services
 
     public interface INetworkDiagnostics : IService, IDisposable
     {
-        IObservable<string> Entries { get; }
-
         void Record(string direction, string messageType);
     }
 }

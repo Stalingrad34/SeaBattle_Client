@@ -14,14 +14,31 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
         [SerializeField] private Button joinButton;
         [SerializeField] private Button createButton;
         [SerializeField] private Text statusText;
+        private RoomPopupModel _model;
 
         protected override void SetModel(RoomPopupModel model)
         {
+            _model = model;
             Bind(joinInput, joinButton, model.JoinRoomName, model.Busy);
             Bind(createInput, createButton, model.CreateRoomName, model.Busy);
-            model.Status.Subscribe(value => statusText.text = value).AddTo(gameObject);
-            joinButton.OnClickAsObservable().Subscribe(_ => model.ConnectAsync(false).Forget()).AddTo(gameObject);
-            createButton.OnClickAsObservable().Subscribe(_ => model.ConnectAsync(true).Forget()).AddTo(gameObject);
+            model.Status.Subscribe(StatusChanged).AddTo(gameObject);
+            joinButton.OnClick(Join).AddTo(gameObject);
+            createButton.OnClick(Create).AddTo(gameObject);
+        }
+
+        private void StatusChanged(string value)
+        {
+            statusText.text = value;
+        }
+
+        private void Join()
+        {
+            _model.ConnectAsync(false).Forget();
+        }
+
+        private void Create()
+        {
+            _model.ConnectAsync(true).Forget();
         }
 
         private void Bind(InputField input, Button button, ReactiveProperty<string> name, ReactiveProperty<bool> busy)

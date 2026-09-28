@@ -21,12 +21,9 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
         private readonly ISessionService _session;
         private readonly IServerTimeService _time;
         private readonly NetworkSimulator _network;
-        private readonly bool _ownsNetwork;
         private MatchState _currentState;
         private readonly Subject<MatchState> _stateChanged = new();
         private readonly Subject<CommandResult> _commandResults = new();
-        private readonly Subject<string> _errors = new();
-        private readonly Subject<int> _disconnected = new();
         private readonly ReactiveProperty<ConnectionStatus> _status = new(ConnectionStatus.Idle);
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private ColyseusClient _client;
@@ -42,28 +39,22 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
         private double _lastClockReply;
         private double _nextHeartbeat;
 
-        public bool IsInitialized => _client != null;
-        public string RoomId => _room?.RoomId;
-        public string SessionId => _room?.SessionId;
         public MatchState CurrentState => _currentState;
         public IReadOnlyReactiveProperty<ConnectionStatus> Status => _status;
         public bool CanResume => !string.IsNullOrEmpty(_session.Recovery.reconnectionToken)
             && _session.Recovery.endpoint == _config.Endpoint;
         public IObservable<CommandResult> CommandResults => _commandResults;
-        public IObservable<string> Errors => _errors;
         public IObservable<MatchState> StateChanged => _stateChanged;
-        public IObservable<int> Disconnected => _disconnected;
 
         public ColyseusTransportService(ConnectionConfig config, INetworkDiagnostics diagnostics,
-            ISessionService session, IServerTimeService time, GameConfig game, NetworkSimulator network = null)
+            ISessionService session, IServerTimeService time, GameConfig game, NetworkSimulator network)
         {
             _config = config;
             _diagnostics = diagnostics;
             _session = session;
             _time = time;
             _game = game;
-            _ownsNetwork = network == null;
-            _network = network ?? new NetworkSimulator(config, diagnostics);
+            _network = network;
         }
 
         public UniTask InitAsync(CancellationToken token)
@@ -252,7 +243,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             room.OnMessage<string>("error", error =>
             {
                 if (IsCurrent(room, generation))
-                    Receive("error", () => _errors.OnNext(error));
+                    Receive("error", () => _diagnostics.Record("ошибка сервера", error));
             });
             room.OnLeave += code =>
             {
@@ -260,7 +251,6 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                 {
                     stateReady.TrySetException(new InvalidOperationException("Connection closed."));
                     timeReady.TrySetException(new InvalidOperationException("Connection closed."));
-                    _disconnected.OnNext(code);
                     Recover();
                 }
             };
@@ -272,7 +262,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             ReceiveState(room.State);
             _lastClockReply = _clock.Elapsed.TotalMilliseconds;
             _awaitedClockRequest = 0;
-            await RequestClockAsync(room, timeout.Token);
+            RequestClock(room, timeout.Token);
             await UniTask.WhenAll(stateReady.Task, timeReady.Task).AttachExternalCancellation(timeout.Token);
             if (!IsCurrent(room, generation))
                 throw new OperationCanceledException(token);
@@ -284,7 +274,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             return !_disposed && _room == room && _generation == generation;
         }
 
-        private UniTask RequestClockAsync(ColyseusRoom<MatchState> room, CancellationToken token)
+        private void RequestClock(ColyseusRoom<MatchState> room, CancellationToken token)
         {
             _awaitedClockRequest = ++_clockRequest;
             _clockSentAt = _clock.Elapsed.TotalMilliseconds;
@@ -293,7 +283,6 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             var generation = _generation;
             _network.Deliver("→", "serverTime " + request,
                 () => SendWireAsync(room, "serverTime", request, token).Forget(), () => IsCurrent(room, generation), token);
-            return UniTask.CompletedTask;
         }
 
         private async UniTaskVoid MonitorAsync(CancellationToken token)
@@ -308,7 +297,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                         return;
                     }
                     if (_awaitedClockRequest == 0 && _clock.Elapsed.TotalMilliseconds >= _nextHeartbeat)
-                        await RequestClockAsync(_room, token);
+                        RequestClock(_room, token);
                     await UniTask.Delay(100, ignoreTimeScale: true, cancellationToken: token);
                 }
             }
@@ -447,12 +436,8 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                 return;
             _disposed = true;
             Disconnect();
-            if (_ownsNetwork)
-                _network.Dispose();
             _commandResults.Dispose();
-            _errors.Dispose();
             _stateChanged.Dispose();
-            _disconnected.Dispose();
             _status.Dispose();
             if (_opening == null || _opening.IsCompleted)
                 ReleaseClient();

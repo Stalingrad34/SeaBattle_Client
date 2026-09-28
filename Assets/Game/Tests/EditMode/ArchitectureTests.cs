@@ -19,7 +19,7 @@ namespace Game.Tests
         public void SchemaRejectsWrongPlayerAndPublishesInPlacePatches()
         {
             var session = new SessionService();
-            session.BeginConnection("m", "a");
+            session.SaveConnection("ws://localhost:2567", "m", "a", null);
             using var match = new MatchService(session);
             Assert.That(match.Apply(Snapshot("b", 8)), Is.False);
             var accepted = Snapshot("a", 2);
@@ -38,7 +38,7 @@ namespace Game.Tests
         public void ReconnectedFullStateReplacesOldObjectAtSameRevision()
         {
             var session = new SessionService();
-            session.BeginConnection("m", "a");
+            session.SaveConnection("ws://localhost:2567", "m", "a", null);
             using var match = new MatchService(session);
             match.Apply(Snapshot("a", 2));
             var restored = Snapshot("a", 2);
