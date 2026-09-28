@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using Game.Scripts.Infrastructure.Core.States;
 using Game.Scripts.Infrastructure.Implementations.States;
+using Game.Scripts.Infrastructure.Implementations.UI.DebugPanel;
 using UnityEngine;
 using Zenject;
 
@@ -13,6 +14,8 @@ namespace Game.Scripts.Infrastructure.Core
         {
             ProjectContext.Instance.EnsureIsInitialized();
             _states = ProjectContext.Instance.Container.Resolve<StateMachine>();
+            var debugPanel = Resources.Load<DebugPanelView>("DebugPanelView");
+            ProjectContext.Instance.Container.InstantiatePrefabForComponent<DebugPanelView>(debugPanel, transform);
         }
 
         private void Start()

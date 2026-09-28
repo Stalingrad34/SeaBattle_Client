@@ -20,6 +20,7 @@ namespace Game.Scripts.Infrastructure.Implementations.States
         {
             var model = _factory.Create();
             await _ui.ShowPopupAsync<RoomPopupView, RoomPopupModel>(model);
+            model.ResumeAsync().Forget();
         }
     }
 }

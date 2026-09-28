@@ -65,9 +65,49 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup
                 if (!_lifetime.IsCancellationRequested)
                     Status.Value = error.Message.Contains("room_name_taken")
                         ? "Это имя уже занято. Введите другое."
+                        : error.Message.Contains("invalid_game_config")
+                        ? "Сервер отклонил параметры игры. Проверьте GameConfig."
                         : create ? "Не удалось создать комнату. Проверьте сервер."
                         : "Комната не найдена, заполнена или уже начала игру.";
                 _transport.Disconnect();
+            }
+            finally
+            {
+                if (!_lifetime.IsCancellationRequested)
+                    Busy.Value = false;
+            }
+        }
+
+        public async UniTask ResumeAsync()
+        {
+            if (!_transport.CanResume || Busy.Value)
+                return;
+            Busy.Value = true;
+            Status.Value = "Восстанавливаем предыдущую партию…";
+            try
+            {
+                _match.Reset();
+                if (await _transport.ResumeAsync(_lifetime.Token))
+                {
+                    var battle = _battleFactory.Create();
+                    await _ui.ShowPopupAsync<BattlePopupView, BattlePopupModel>(battle);
+                    _enteredBattle = true;
+                    Close();
+                }
+                else
+                {
+                    Status.Value = _transport.Status.Value == Game.Scripts.Infrastructure.Core.Network.ConnectionStatus.SessionExpired
+                        ? "Партия больше недоступна. Создайте новую комнату."
+                        : "Сессию восстановить не удалось. Можно начать новую партию.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception)
+            {
+                if (!_lifetime.IsCancellationRequested)
+                    Status.Value = "Не удалось восстановить соединение.";
             }
             finally
             {

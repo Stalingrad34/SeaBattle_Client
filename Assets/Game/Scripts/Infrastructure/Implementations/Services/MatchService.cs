@@ -18,7 +18,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Services
 
         public bool Apply(MatchState state)
         {
-            if (state == null || string.IsNullOrEmpty(_session.MatchId) || state.matchId != _session.MatchId || state.players == null || !state.players.ContainsKey(_session.PlayerId) || state.revision <= _revision)
+            if (state == null || string.IsNullOrEmpty(_session.MatchId) || state.matchId != _session.MatchId || state.players == null || !state.players.ContainsKey(_session.PlayerId) || state.revision < _revision || state.revision == _revision && ReferenceEquals(state, _state.Value))
                 return false;
             _revision = state.revision;
             // Colyseus patches the same instance in place; notify after each accepted patch.

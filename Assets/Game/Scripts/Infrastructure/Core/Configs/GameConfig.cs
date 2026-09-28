@@ -21,7 +21,7 @@ namespace Game.Scripts.Infrastructure.Core.Configs
         public int ReconnectGraceSeconds = 120;
         public void Validate()
         {
-            if (BoardSize < 2 || BoardSize > 32 || TurnDurationSeconds < 1 || ReconnectGraceSeconds < 1)
+            if (BoardSize < 2 || BoardSize > 32 || TurnDurationSeconds < 1 || TurnDurationSeconds > 86400 || ReconnectGraceSeconds < 1)
                 throw new InvalidOperationException("Invalid game configuration.");
             if (ShipLengths == null || ShipLengths.Length == 0)
                 throw new InvalidOperationException("At least one ship is required.");

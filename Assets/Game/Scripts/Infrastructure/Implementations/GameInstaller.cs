@@ -10,6 +10,7 @@ using UnityEngine;
 using Zenject;
 using Game.Scripts.Infrastructure.Implementations.UI.Popups.GameOverPopup;
 using Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup;
+using Game.Scripts.Infrastructure.Implementations.UI.DebugPanel;
 
 namespace Game.Scripts.Infrastructure.Implementations
 {
@@ -33,9 +34,12 @@ namespace Game.Scripts.Infrastructure.Implementations
             Container.Bind<GameState>().AsSingle();
             Container.BindInterfacesAndSelfTo<ColyseusTransportService>().AsSingle();
             Container.BindInterfacesAndSelfTo<SessionService>().AsSingle();
+            Container.Bind<Game.Scripts.Infrastructure.Core.Services.ISessionStorage>().To<PlayerPrefsSessionStorage>().AsSingle();
             Container.BindInterfacesAndSelfTo<MatchService>().AsSingle();
             Container.BindInterfacesAndSelfTo<ServerTimeService>().AsSingle();
             Container.BindInterfacesAndSelfTo<NetworkDiagnostics>().AsSingle();
+            Container.BindInterfacesAndSelfTo<NetworkSimulator>().AsSingle();
+            Container.BindInterfacesAndSelfTo<DebugPanelModel>().AsSingle();
             Container.BindFactory<RoomPopupModel, RoomPopupModel.Factory>();
             Container.BindFactory<BattlePopupModel, BattlePopupModel.Factory>();
             Container.BindFactory<bool, GameOverPopupModel, GameOverPopupModel.Factory>();

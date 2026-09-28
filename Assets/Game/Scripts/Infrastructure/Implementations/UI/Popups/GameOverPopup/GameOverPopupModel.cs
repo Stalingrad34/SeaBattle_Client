@@ -4,6 +4,7 @@ using Game.Scripts.Infrastructure.Core.UI;
 using Game.Scripts.Infrastructure.Implementations.States;
 using UniRx;
 using Zenject;
+using Game.Scripts.Infrastructure.Core.Services;
 
 namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.GameOverPopup
 {
@@ -15,15 +16,18 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.GameOverPopup
 
         public readonly ReactiveProperty<bool> Won = new();
         private readonly StateMachine _states;
+        private readonly ITransportService _transport;
 
-        public GameOverPopupModel(bool won, UIManager ui, StateMachine states) : base(ui)
+        public GameOverPopupModel(bool won, UIManager ui, StateMachine states, ITransportService transport) : base(ui)
         {
             Won.Value = won;
             _states = states;
+            _transport = transport;
         }
 
         public void ReturnToMenu()
         {
+            _transport.Leave();
             _states.EnterAsync<GameState>().Forget();
         }
     }

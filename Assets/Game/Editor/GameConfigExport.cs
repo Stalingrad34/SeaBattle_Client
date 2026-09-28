@@ -19,7 +19,7 @@ namespace Game.Editor
                 throw new System.InvalidOperationException("Place the server repository in Server first.");
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, "game.json"), JsonUtility.ToJson(config, true));
-            Debug.Log("[SeaBattle] Exported Server/config/game.json. Restart server to apply supported rules.");
+            Debug.Log("[SeaBattle] Exported server defaults to Server/config/game.json. New rooms use the updated defaults.");
         }
     }
 }

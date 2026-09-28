@@ -40,6 +40,7 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
         private bool _connected = true;
         private bool _timedOut;
         private bool _resultShown;
+        private bool _sending;
         private readonly UIManager _ui;
         private readonly GameOverPopupModel.Factory _resultFactory;
 
@@ -62,10 +63,10 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
             SecondsLeft.AddTo(Disposables);
             transport.StateChanged.Subscribe(state => match.Apply(state)).AddTo(Disposables);
             transport.CommandResults.Subscribe(OnResult).AddTo(Disposables);
-            transport.Disconnected.Subscribe(_ => ConnectionLost()).AddTo(Disposables);
-            transport.Errors.Subscribe(_ => ConnectionLost()).AddTo(Disposables);
+            Pending.Value = session.Recovery.pending;
             match.State.Subscribe(StateChanged).AddTo(Disposables);
             match.Apply(transport.CurrentState);
+            transport.Status.Subscribe(ConnectionChanged).AddTo(Disposables);
             Observable.EveryUpdate().Subscribe(_ => Tick()).AddTo(Disposables);
         }
 
@@ -99,8 +100,18 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
             _sentAtMs = _time.NowMs;
             _result = null;
             _timedOut = false;
+            _session.SavePending(Pending.Value);
             Feedback.Value = "Выстрел отправлен. Ожидаем ответ…";
             Refresh();
+            await SendPendingAsync();
+        }
+
+        private async UniTask SendPendingAsync()
+        {
+            if (_sending || !_connected || Pending.Value == null)
+                return;
+            _sending = true;
+            _sentAtMs = _time.NowMs;
             try
             {
                 await _transport.SendAsync(Pending.Value, _lifetime.Token);
@@ -112,7 +123,11 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
             catch (Exception)
             {
                 if (!_lifetime.IsCancellationRequested)
-                    ConnectionLost();
+                    Feedback.Value = "Ответ не получен. Результат выстрела пока неизвестен.";
+            }
+            finally
+            {
+                _sending = false;
             }
         }
 
@@ -123,6 +138,7 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
             _result = result;
             if (result.status == "rejected")
             {
+                _session.SavePending(null);
                 Pending.Value = null;
                 Feedback.Value = RejectionText(result.reason);
             }
@@ -148,13 +164,16 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
                         : shot.result == "hit" ? "Попадание!" : "Промах";
                     break;
                 }
+                _session.SavePending(null);
                 Pending.Value = null;
                 _result = null;
                 Feedback.Value = feedback;
             }
             CanFire.Value = _connected && Pending.Value == null && state?.phase == "playing"
                 && state.activePlayerId == PlayerId && remainingSeconds > 0;
-            Status.Value = !_connected ? "Соединение потеряно"
+            Status.Value = _transport.Status.Value == ConnectionStatus.SessionExpired ? "Партия больше недоступна"
+                : !_connected ? _transport.Status.Value == ConnectionStatus.Reconnecting
+                ? "Восстанавливаем соединение…" : "Соединение потеряно"
                 : state == null ? "Получаем состояние…"
                 : state.phase == "waiting" ? "Ожидаем второго игрока"
                 : state.phase == "finished" ? state.winnerId == PlayerId ? "Победа!" : "Поражение"
@@ -164,24 +183,40 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
 
         public void Tick()
         {
-            if (Pending.Value != null && !_timedOut && _time.NowMs - _sentAtMs >= _responseTimeoutMs)
+            if (Pending.Value != null && !_timedOut && _transport.Status.Value != ConnectionStatus.SessionExpired
+                && _time.NowMs - _sentAtMs >= _responseTimeoutMs)
             {
                 _timedOut = true;
                 Feedback.Value = "Ответ задерживается. Результат выстрела пока неизвестен.";
             }
+            if (Pending.Value != null && _time.NowMs - _sentAtMs >= _responseTimeoutMs)
+                SendPendingAsync().Forget();
             Refresh();
         }
 
-        private void ConnectionLost()
+        private void ConnectionChanged(ConnectionStatus status)
         {
-            _connected = false;
-            Feedback.Value = Pending.Value == null ? "Вернитесь к выбору комнаты."
-                : "Соединение потеряно. Результат выстрела пока неизвестен.";
+            _connected = status == ConnectionStatus.Connected;
+            if (_connected)
+            {
+                Feedback.Value = Pending.Value == null ? "" : "Уточняем результат выстрела…";
+                SendPendingAsync().Forget();
+            }
+            else
+            {
+                Feedback.Value = status == ConnectionStatus.SessionExpired
+                    ? "Партия больше недоступна. Вернитесь в меню."
+                    : status == ConnectionStatus.Failed
+                    ? "Не удалось восстановить сессию. Вернитесь в меню."
+                    : Pending.Value == null ? "Ожидаем восстановления связи."
+                    : "Соединение потеряно. Результат выстрела пока неизвестен.";
+            }
             Refresh();
         }
 
         public void Leave()
         {
+            _transport.Leave();
             _states.EnterAsync<GameState>().Forget();
         }
 
@@ -233,4 +268,3 @@ namespace Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup
         }
     }
 }
-

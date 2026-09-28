@@ -21,11 +21,12 @@ namespace Game.Tests
         private MatchService _match;
         private BattlePopupModel _model;
         private ConnectionConfig _config;
+        private SessionService _session;
 
         [SetUp]
         public void SetUp()
         {
-            var session = new SessionService();
+            var session = _session = new SessionService();
             session.BeginConnection("TEST0001", "a");
             _transport = new FakeTransport { CurrentState = Snapshot(1, "a") };
             _time = new FakeTime();
@@ -100,6 +101,54 @@ namespace Game.Tests
         }
 
         [Test]
+        public void ExpiredRoomKeepsUnknownShotBlockedAndShowsMenuInstruction()
+        {
+            _model.FireAsync(0, 0).GetAwaiter().GetResult();
+            _transport.Connection.Value = ConnectionStatus.SessionExpired;
+            _time.NowMs = 20000;
+            _model.Tick();
+            _model.FireAsync(1, 0).GetAwaiter().GetResult();
+            Assert.That(_model.Pending.Value, Is.Not.Null);
+            Assert.That(_model.CanFire.Value, Is.False);
+            Assert.That(_transport.SendCount, Is.EqualTo(1));
+            Assert.That(_model.Status.Value, Is.EqualTo("Партия больше недоступна"));
+            Assert.That(_model.Feedback.Value, Does.Contain("Вернитесь в меню"));
+        }
+
+        [Test]
+        public void ReconnectionRepeatsSamePendingCommandAndWaitsForAuthoritativeState()
+        {
+            _model.FireAsync(0, 0).GetAwaiter().GetResult();
+            var command = _transport.LastCommand;
+            Assert.That(_session.Recovery.pending, Is.SameAs(command));
+            _transport.Connection.Value = ConnectionStatus.Reconnecting;
+            _model.FireAsync(1, 0).GetAwaiter().GetResult();
+            Assert.That(_transport.SendCount, Is.EqualTo(1));
+            Assert.That(_model.CanFire.Value, Is.False);
+            _transport.Connection.Value = ConnectionStatus.Connected;
+            Assert.That(_transport.SendCount, Is.EqualTo(2));
+            Assert.That(_transport.LastCommand, Is.SameAs(command));
+            _transport.Results.OnNext(Result("applied"));
+            Assert.That(_session.Recovery.pending, Is.Not.Null);
+            _transport.States.OnNext(Snapshot(2, "b", true));
+            Assert.That(_session.Recovery.pending, Is.Null);
+        }
+
+        [Test]
+        public void RecreatedModelResendsUnresolvedShotWithOriginalId()
+        {
+            _model.FireAsync(0, 0).GetAwaiter().GetResult();
+            var command = _transport.LastCommand;
+            _model.Dispose();
+            _model = new BattlePopupModel(null, _transport, _match, _session, _time, null, _config, null);
+            Assert.That(_transport.SendCount, Is.EqualTo(2));
+            Assert.That(_transport.LastCommand.commandId, Is.EqualTo(command.commandId));
+            Assert.That(_model.CanFire.Value, Is.False);
+            _transport.Results.OnNext(Result("rejected"));
+            Assert.That(_session.Recovery.pending, Is.Null);
+        }
+
+        [Test]
         public void TimerNotifiesOnlyWhenDisplayedSecondChanges()
         {
             var values = new List<int?>();
@@ -138,7 +187,7 @@ namespace Game.Tests
             Assert.That(_model.CanFire.Value, Is.False);
             Assert.That(_model.SecondsLeft.Value, Is.Zero);
             _time.NowMs = 0;
-            _transport.Leaves.OnNext(1006);
+            _transport.Connection.Value = ConnectionStatus.Failed;
             _model.Tick();
             Assert.That(_model.CanFire.Value, Is.False);
             Assert.That(_model.Status.Value, Is.EqualTo("Соединение потеряно"));
@@ -197,6 +246,16 @@ namespace Game.Tests
 
         private sealed class FakeTransport : ITransportService
         {
+            public readonly ReactiveProperty<ConnectionStatus> Connection = new(ConnectionStatus.Connected);
+            public IReadOnlyReactiveProperty<ConnectionStatus> Status => Connection;
+            public bool CanResume => false;
+            public UniTask<bool> ResumeAsync(CancellationToken token)
+            {
+                return UniTask.FromResult(false);
+            }
+            public void Leave()
+            {
+            }
             public readonly Subject<CommandResult> Results = new();
             public readonly Subject<MatchState> States = new();
             public readonly Subject<int> Leaves = new();
@@ -225,6 +284,7 @@ namespace Game.Tests
             }
             public void Dispose()
             {
+                Connection.Dispose();
                 Results.Dispose();
                 States.Dispose();
                 Leaves.Dispose();
