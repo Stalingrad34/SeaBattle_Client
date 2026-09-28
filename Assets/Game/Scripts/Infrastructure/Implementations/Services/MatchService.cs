@@ -31,5 +31,11 @@ namespace Game.Scripts.Infrastructure.Implementations.Services
         {
             _state.Dispose();
         }
+
+        public void Reset()
+        {
+            _revision = -1;
+            _state.Value = null;
+        }
     }
 }

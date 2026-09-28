@@ -8,6 +8,8 @@ using Game.Scripts.Infrastructure.Implementations.States;
 using Game.Scripts.Infrastructure.Implementations.UI.Popups.RoomPopup;
 using UnityEngine;
 using Zenject;
+using Game.Scripts.Infrastructure.Implementations.UI.Popups.GameOverPopup;
+using Game.Scripts.Infrastructure.Implementations.UI.Popups.BattlePopup;
 
 namespace Game.Scripts.Infrastructure.Implementations
 {
@@ -35,6 +37,8 @@ namespace Game.Scripts.Infrastructure.Implementations
             Container.BindInterfacesAndSelfTo<ServerTimeService>().AsSingle();
             Container.BindInterfacesAndSelfTo<NetworkDiagnostics>().AsSingle();
             Container.BindFactory<RoomPopupModel, RoomPopupModel.Factory>();
+            Container.BindFactory<BattlePopupModel, BattlePopupModel.Factory>();
+            Container.BindFactory<bool, GameOverPopupModel, GameOverPopupModel.Factory>();
         }
     }
 }

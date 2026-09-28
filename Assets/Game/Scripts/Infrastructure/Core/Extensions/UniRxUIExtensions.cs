@@ -20,5 +20,10 @@ namespace Game.Scripts.Infrastructure.Core.Extensions
         {
             return input.onValueChanged.AsObservable().Subscribe(value => callback?.Invoke(value));
         }
+        
+        public static IDisposable OnClick(this Button button, Action method)
+        {
+            return button.onClick.AsObservable().Subscribe(_ => method?.Invoke());
+        }
     }
 }

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Colyseus;
@@ -15,6 +17,7 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
         private readonly ConnectionConfig _config;
         private readonly INetworkDiagnostics _diagnostics;
         private readonly ISessionService _session;
+        private readonly IServerTimeService _time;
         private readonly Subject<MatchState> _stateChanged = new();
         private readonly Subject<CommandResult> _commandResults = new();
         private readonly Subject<string> _errors = new();
@@ -27,16 +30,18 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
         public bool IsInitialized => _client != null;
         public string RoomId => _room?.RoomId;
         public string SessionId => _room?.SessionId;
+        public MatchState CurrentState => _room?.State;
         public IObservable<CommandResult> CommandResults => _commandResults;
         public IObservable<string> Errors => _errors;
         public IObservable<MatchState> StateChanged => _stateChanged;
         public IObservable<int> Disconnected => _disconnected;
 
-        public ColyseusTransportService(ConnectionConfig config, INetworkDiagnostics diagnostics, ISessionService session)
+        public ColyseusTransportService(ConnectionConfig config, INetworkDiagnostics diagnostics, ISessionService session, IServerTimeService time)
         {
             _config = config;
             _diagnostics = diagnostics;
             _session = session;
+            _time = time;
         }
 
         public UniTask InitAsync(CancellationToken token)
@@ -49,28 +54,32 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             return UniTask.CompletedTask;
         }
 
-        public async UniTask ConnectAsync(CancellationToken token)
+        public async UniTask ConnectAsync(string roomName, bool create, CancellationToken token)
         {
             if (_room != null || _connecting)
                 throw new InvalidOperationException("Already connected or connecting.");
             await InitAsync(token);
             _connecting = true;
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            using var timeoutTimer = timeout.CancelAfterSlim(TimeSpan.FromSeconds(_config.TimeoutSeconds));
             try
             {
-                await JoinAsync(token).AsUniTask().AttachExternalCancellation(token);
+                await JoinAsync(roomName, create, timeout.Token).AsUniTask().AttachExternalCancellation(timeout.Token);
             }
             catch
             {
-                Dispose();
+                Disconnect();
                 throw;
             }
         }
 
-        private async Task JoinAsync(CancellationToken token)
+        private async Task JoinAsync(string roomName, bool create, CancellationToken token)
         {
             try
             {
-                var room = await _client.JoinOrCreate<MatchState>(_config.RoomName);
+                var room = create
+                    ? await _client.Create<MatchState>(_config.RoomName, new Dictionary<string, object> { ["roomName"] = roomName })
+                    : await _client.JoinById<MatchState>(roomName);
                 // Colyseus join has no cancellation token: close a late connection after scene teardown.
                 if (_disposed || token.IsCancellationRequested)
                 {
@@ -78,8 +87,15 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                     throw new OperationCanceledException(token);
                 }
                 _room = room;
+                var stateReady = new UniTaskCompletionSource();
+                var clockReady = new UniTaskCompletionSource();
                 _session.BeginConnection(room.RoomId, room.SessionId);
                 room.OnStateChange += OnStateChange;
+                room.OnStateChange += (state, _) =>
+                {
+                    if (state.players != null && state.players.ContainsKey(room.SessionId))
+                        stateReady.TrySetResult();
+                };
                 room.OnLeave += OnLeave;
                 room.OnError += OnError;
                 room.OnMessage<CommandResult>("commandResult", result =>
@@ -94,8 +110,21 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                     if (!_disposed)
                         _errors.OnNext(error);
                 });
+                var clock = Stopwatch.StartNew();
+                room.OnMessage<double>("serverTime", serverTime =>
+                {
+                    if (_disposed || _room != room)
+                        return;
+                    _time.Synchronize(serverTime, clock.Elapsed.TotalMilliseconds);
+                    clockReady.TrySetResult();
+                });
                 if (room.State?.players != null && room.State.players.ContainsKey(room.SessionId))
+                {
                     OnStateChange(room.State, true);
+                    stateReady.TrySetResult();
+                }
+                await room.Send("serverTime");
+                await UniTask.WhenAll(stateReady.Task, clockReady.Task).AttachExternalCancellation(token);
                 _diagnostics.Record("connected", room.RoomId);
             }
             finally
@@ -140,6 +169,17 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
             if (_disposed)
                 return;
             _disposed = true;
+            Disconnect();
+            _commandResults.Dispose();
+            _errors.Dispose();
+            _stateChanged.Dispose();
+            _disconnected.Dispose();
+            if (!_connecting)
+                ReleaseClient();
+        }
+
+        public void Disconnect()
+        {
             if (_room != null)
             {
                 _room.OnLeave -= OnLeave;
@@ -148,12 +188,6 @@ namespace Game.Scripts.Infrastructure.Implementations.Network
                 CloseAsync(_room).Forget();
                 _room = null;
             }
-            _commandResults.Dispose();
-            _errors.Dispose();
-            _stateChanged.Dispose();
-            _disconnected.Dispose();
-            if (!_connecting)
-                ReleaseClient();
         }
 
         private void ReleaseClient()

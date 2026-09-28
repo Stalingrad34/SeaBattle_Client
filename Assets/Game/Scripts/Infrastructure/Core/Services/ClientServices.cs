@@ -12,6 +12,7 @@ namespace Game.Scripts.Infrastructure.Core.Services
         string RoomId { get; }
 
         string SessionId { get; }
+        MatchState CurrentState { get; }
 
         IObservable<CommandResult> CommandResults { get; }
 
@@ -21,8 +22,9 @@ namespace Game.Scripts.Infrastructure.Core.Services
 
         IObservable<int> Disconnected { get; }
 
-        UniTask ConnectAsync(CancellationToken token);
+        UniTask ConnectAsync(string roomName, bool create, CancellationToken token);
         UniTask SendAsync(FireCommand command, CancellationToken token);
+        void Disconnect();
     }
 
     public interface ISessionService : IService
@@ -39,6 +41,7 @@ namespace Game.Scripts.Infrastructure.Core.Services
         IReadOnlyReactiveProperty<MatchState> State { get; }
 
         bool Apply(MatchState state);
+        void Reset();
     }
 
     public interface IServerTimeService : IService
