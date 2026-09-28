@@ -1,0 +1,6 @@
+[mcp_servers.ai-game-developer]
+enabled = true
+http_headers = { "Authorization" = "Bearer agd_pk_DYcB6DJI6KiAWne0yzvVwwIFGLY6CVlF5K0jp1lVZgc" }
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+url = "https://ai-game.dev/mcp/p/28ca6e4e"
